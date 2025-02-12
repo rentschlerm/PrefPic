@@ -1,20 +1,23 @@
 // Add_1.tsx page
-import { router } from "expo-router";
+import { router, useRouter } from "expo-router";
 import React, { useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from "react-native";
 
 const AddProcedure: React.FC = () => {
   // State variable to store the procedure name
-const [procedureName, setProcedureName] = useState("");
+const [procedureName, setProcedureName] = useState('');
+const router =  useRouter();
 
   // RJP - > 2/7/2025
  // Function to navigate to the "camera" screen with procedureName as a parameter
 const navigateToReviewImage = () => {
   router.push({
     pathname: "camera", // Navigating to the "camera" route
-    params: { procedureName: procedureName }, // Passing procedureName as a parameter 
+    params: { procedureName }, // Passing procedureName as a parameter 
   });
+  
 };
+
 
 
   return (
