@@ -5,11 +5,10 @@ import { useRef,useState } from 'react';
 import { router,useLocalSearchParams } from "expo-router";
 import { Button, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Image } from 'react-native';
+//Alberto -> 2/011/2025
+import * as FileSystem from 'expo-file-system';
 
 
-const navigateToaddprocedure = () => {
-  router.replace("addProcedure");
-}
 
 export default function Camera() {
   const [facing] = useState<CameraType>('back'); //use back camera
@@ -34,26 +33,46 @@ export default function Camera() {
     );
   }
 
+  const navigateToaddprocedure = () => {
+    setPhoto(null); 
+    router.replace("addProcedure");
+  }
+
   // Function to take a picture
   async function takePicture() {
     if (cameraRef.current) {
+      try {
       const photoData = await cameraRef.current.takePictureAsync();
-      
+    
+   
+      // Debugging: Log the captured photo URI
+      console.log("Captured photo URI: ", photoData?.uri);
+     
+       //RJP -> 2/011/2025
     // Check if photoData is defined before setting the URI
     if (photoData?.uri) {
-      setPhoto(photoData.uri); // Save the image URI
+      //copy the file to a new location to prevent image lost when app or cache reset
+     const newUri= FileSystem.documentDirectory + "tempImage.jpg";
+     await FileSystem.copyAsync({
+      from: photoData.uri, to: newUri,
+     });
+
+     setPhoto(newUri); // Save the image URI
+     
 
       // Navigate to Add_3.tsx with the photo URI and procedureName
       router.push({
         pathname: "reviewImage",
-        params: { photoUri: photoData.uri, procedureName: procedureName },
+        params: { photoUri: newUri, procedureName: procedureName },
       });
     } else {
-        console.error("Failed to capture photo");
+      console.error("Failed to capture photo: photoData or photoData.uri is undefined");
     }
+  } catch (error) {
+    console.error("Error capturing photo: ", error);
   }
 }
-
+}
   return (
     <View style={styles.container}>
 
@@ -186,7 +205,7 @@ const styles = StyleSheet.create({
   },
 
   backText: {
-    marginTop: -70,
+    marginTop: 5,
     fontSize: 16,
     color: '#007AFF',
   },
