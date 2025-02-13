@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Define the type for the AuthContext
+// Define the type for AuthContext
 interface AuthContextType {
   authCode: string | null;
   saveAuthCode: (code: string) => Promise<void>;
