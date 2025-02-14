@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image, Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import CryptoJS from "crypto-js";
-
+import { getDeviceID } from '../components/deviceInfo';
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -102,9 +102,14 @@ const styles = StyleSheet.create({
 export default function ReviewImage() {
   const router = useRouter();
 
+  const [photoUriState, setPhotoUriState] = useState<string | null>(null);
+  const [isPreview, setIsPreview] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+const [deviceID, setDeviceID] = useState<{id:string} | null>(null);
 
    //RJP -> 2/7/2025
   // (import) image and procedure name from add_2.tsx 
+  
   const { photoUri, procedureName } = useLocalSearchParams<{
     photoUri: string;
     procedureName: string;
@@ -115,10 +120,7 @@ export default function ReviewImage() {
   // Decode the photo URI
   //const decodedPhotoUri = photoUri ? decodeURIComponent(photoUri) : null;
   // Store photoUri in a state variable
-  const [photoUriState, setPhotoUriState] = useState<string | null>(null);
-  const [isPreview, setIsPreview] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-
+  
 
     //RJP 2/11/2025
   //force React Native to reload the image.
@@ -131,8 +133,19 @@ export default function ReviewImage() {
     }
   }, [photoUri]);
 
+     useEffect(() => {
+        
+        const fetchDeviceID = async () => {
+          const id = await getDeviceID();
+          setDeviceID(id);
+        };
+          fetchDeviceID();
+        }, []);
+  
+
   
 //Alberto -> 2/11/2025
+//API CALL  -> 2/13/2025
   const navigateToCamera = () => {
     // Reset photoUriState before navigating back
     setPhotoUriState(null);
@@ -150,80 +163,89 @@ export default function ReviewImage() {
   };
   //ALBERTO -> 2/11/2025
   ///API CALL 
-  const navigateToReviewSummary = async (deviceID: string, procedureID: string, fileUri: string, fileType: string) => {
+  const navigateToReviewSummary = async (fileUri: string, fileType: string) => {
     try {
       console.log("🔹 Starting API call...");
   
-      // Check deviceID
-      if (!deviceID) {
-        Alert.alert("Device ID Error", "Unable to retrieve device ID.");
+      // Retrieve procedureSerial from AsyncStorage
+      const procedureSerial = await AsyncStorage.getItem("currentProcedureSerial");
+      if (!procedureSerial) {
+        Alert.alert("Error", "Procedure not found. Please create a procedure first.");
         return;
       }
+      console.log("🔹 Procedure Serial:", procedureSerial);
+  
+      // Retrieve deviceID from AsyncStorage
+    
+      if (!deviceID) {
+        Alert.alert("Error", "Device ID not found.");
+        return;
+      }
+      console.log("🔹 Device ID:", deviceID);
   
       // Retrieve authorizationCode from AsyncStorage
       const authorizationCode = await AsyncStorage.getItem("authorizationCode");
-      console.log("🔹 Retrieved Authorization Code:", authorizationCode);
-  
       if (!authorizationCode) {
-        Alert.alert("Authorization Error", "Missing authorization code. Please log in again.");
+        Alert.alert("Authorization Error", "Please log in again.");
         return;
       }
+      console.log("🔹 Authorization Code:", authorizationCode);
   
-      // Generate formatted date
+      // Generate formatted date and key
       const currentDate = new Date();
       const formattedDate = `${String(currentDate.getMonth() + 1).padStart(2, "0")}/${String(
         currentDate.getDate()
       ).padStart(2, "0")}/${currentDate.getFullYear()}-${String(currentDate.getHours()).padStart(2, "0")}:${String(
         currentDate.getMinutes()
       ).padStart(2, "0")}`;
-  
-      // Generate key using SHA1
-      const keyString = `${deviceID}${formattedDate}${authorizationCode}`;
+      
+      
+      const keyString = `${deviceID.id}${formattedDate}${authorizationCode}`;
+      console.log("🔹 Key String:", keyString);
       const key = CryptoJS.SHA1(keyString).toString();
       console.log("🔹 Generated Key:", key);
   
       // Create FormData
       const formData = new FormData();
-      formData.append("DeviceID", encodeURIComponent(deviceID));
+      formData.append("DeviceID", encodeURIComponent(deviceID.id));
       formData.append("Date", formattedDate);
       formData.append("Key", key);
       formData.append("AC", authorizationCode);
       formData.append("PrefPicVersion", "1");
-      formData.append("Procedure", procedureID);
+      formData.append("Procedure", procedureSerial); // Use procedureSerial here
       formData.append("Type", fileType);
       formData.append("Media", {
         uri: fileUri,
         type: fileType,
-        name: `upload.${fileType.split("/")[1]}`,
+        name: `upload.${fileType.split("/")[1] || "jpg"}`,
       } as any);
   
-      // Log FormData for debugging
-      console.log("🔹 FormData:", formData);
-  
-      // API URL
-      const url = `https://prefpic.com/dev/PPService/CreatePicture.php?DeviceID=${encodeURIComponent(deviceID)}&Date=${formattedDate}&Key=${key}&AC=${authorizationCode}&PrefPicVersion=1&Name=${encodeURIComponent(procedureID)}`;
-      console.log("📸 Sending Image to:", url);
-  
       // Make the API call
+      // const url = `https://prefpic.com/dev/PPService/CreatePicture.php?DeviceID=${encodeURIComponent(deviceID.id)}&Date=${formattedDate}&Key=${key}&AC=${authorizationCode}&PrefPicVersion=1&Name=${encodeURIComponent(procedureSerial)}`;
+      const url = "https://prefpic.com/dev/PPService/CreatePicture.php";
       const response = await fetch(url, {
         method: "POST",
         body: formData,
         headers: {
           'Accept': 'application/json',
-          'Content-Type': 'multipart/form-data',
+              'Content-Type': 'multipart/form-data',
         },
       });
   
-      // Log the response
-      console.log("🔹 API Response Status:", response.status);
+      // Handle response
+      
+
       const data = await response.text();
       console.log("🔹 API Response Body:", data);
+      console.log("🔹 API Response Status:", response.status);
+
   
       if (response.ok) {
-        Alert.alert("Success", "Picture uploaded successfully!");
+        Alert.alert("Success!", "Image uploaded successfully.");
         router.push("viewEditPicture");
       } else {
-        Alert.alert("Upload Failed", "An error occurred during upload.");
+        const errorMessage = data.match(/<Message>(.*?)<\/Message>/)?.[1] || "Upload failed.";
+        Alert.alert("Upload Failed", errorMessage);
       }
     } catch (error) {
       console.error("🔹 Error during picture upload:", error);
@@ -275,11 +297,11 @@ export default function ReviewImage() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.nextbutton}
-          onPress={() => navigateToReviewSummary("deviceID", "procedureID", photoUriState || "", "image/jpeg")}
-        >
-          <Text style={styles.buttonText}>Next</Text>
-        </TouchableOpacity>
+  style={styles.nextbutton}
+  onPress={() => navigateToReviewSummary(photoUriState || "", "image/jpeg")}
+>
+  <Text style={styles.buttonText}>Next</Text>
+</TouchableOpacity>
       </View>
     </View>
   );
