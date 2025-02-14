@@ -6,28 +6,28 @@ const BottomNavigation: React.FC = () => {
     return (
         
         <View style={styles.container}>
-            <TouchableOpacity style={styles.navItem}>
+            <TouchableOpacity style={styles.navItem} disabled={true}>
                 <Image 
                     source={require('../assets/Procedure_blue.png')}
                     style={styles.icon}
                 />
                 <Text style={styles.navTextActive}>Procedure</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.navItem}>
+            <TouchableOpacity style={styles.navItem} disabled={true}>
                 <Image 
                     source={require('../assets/Team_grayed.png')}
                     style={styles.icon}
                 />
                 <Text style={styles.navText}>Team</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.navItem}>
+            <TouchableOpacity style={styles.navItem} disabled={true}>
                 <Image 
                     source={require('../assets/Help_grayed.png')}
                     style={styles.icon}
                 />
                 <Text style={styles.navText}>Help</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.navItem}>
+            <TouchableOpacity style={styles.navItem} disabled={true}>
                 <Image 
                     source={require('../assets/Feedback_grayed.png')}
                     style={styles.icon}

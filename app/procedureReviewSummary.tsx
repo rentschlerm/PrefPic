@@ -1,8 +1,17 @@
-import { router } from "expo-router";
-import React from "react";
+import { router, useRouter } from "expo-router";
+import React, {useState, useEffect} from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
 
 export default function ProcedureReviewSummary() {
+  const [procedureName, setProcedureName] = useState('');
+  const router =  useRouter();
+
+  const navigateToLibrary = () => {
+    router.push({
+      pathname: "library",
+      params: { procedureName },
+    });
+  }
 
   // const navigateToLoading = () => {
   //   router.push("loading");
@@ -66,7 +75,8 @@ export default function ProcedureReviewSummary() {
         </View>
       </ScrollView>
 
-      <TouchableOpacity style={styles.button} >
+      <TouchableOpacity style={styles.button} onPress={navigateToLibrary}>
+
         <Text style={styles.buttonText}>Finish</Text>
       </TouchableOpacity>
     </View>

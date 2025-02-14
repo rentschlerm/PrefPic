@@ -1,60 +1,261 @@
-// pages/library.tsx
-import React from 'react';
-import { View, Text, StyleSheet,SafeAreaView, TouchableOpacity, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import BottomNavigation from '../components/bottomNav';
-import { router } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import CryptoJS from 'crypto-js';
+import { XMLParser } from 'fast-xml-parser';
+import { getDeviceID } from '../components/deviceInfo';
+
+
 
 const LibraryScreen: React.FC = () => {
+    const [deviceID, setDeviceID] = useState<{id:string} | null>(null);
+    const [selectedProcedure, setSelectedProcedure] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false); // Added state for loading
+    const [authorizationCode, setAuthorizationCode] = useState<string | null>(null); // Added state for authorization code
+    const [procedures, setProcedures] = useState<string[]>([
+        "Procedure Name",
+        "Procedure Name",
+        "Procedure Name",
+        "Procedure Name",
+        "Procedure Name",
+        "Procedure Name",
+        "Procedure Name",
+        "Procedure Name",
+    ]); // Updated state for procedures
+    const router = useRouter();
+    const searchParams = useLocalSearchParams();
+    const procedureName = Array.isArray(searchParams.procedureName) ? searchParams.procedureName[0] : searchParams.procedureName;
 
+    // Fetch authorization code from AsyncStorage when the component mounts
+    useEffect(() => {
+        const fetchAuthorizationCode = async () => {
+            try {
+                console.log('Fetching authorization code from AsyncStorage...');
+                const code = await AsyncStorage.getItem('authorizationCode');
+                if (code) {
+                    console.log('Fetched authorization code:', code); // Debugging statement
+                    setAuthorizationCode(code);
+                } else {
+                    console.log('No authorization code found in AsyncStorage');
+                }
+            } catch (error) {
+                console.error('Error fetching authorization code:', error);
+            }
+        };
+        fetchAuthorizationCode();
+    }, []); // Added useEffect to fetch authorization code
+    useEffect(() => {
+      
+      const fetchDeviceID = async () => {
+        const id = await getDeviceID();
+        setDeviceID(id);
+      };
+        fetchDeviceID();
+      }, []);
 
+    // Call GetProcedureList API when the authorization code is available
+    useEffect(() => {
+        if (authorizationCode) {
+            console.log('Calling getProcedureList with authorization code:', authorizationCode); // Debugging statement
+            getProcedureList();
+        } else {
+            console.log('Authorization code not available yet'); // Debugging statement
+        }
+    }, [authorizationCode]); // Added useEffect to call GetProcedureList API
+
+    // Update the procedure list when procedureName is passed
+    useEffect(() => {
+        if (procedureName && !procedures.includes(procedureName)) {
+            setProcedures((prevProcedures) => [...prevProcedures, procedureName]);
+        }
+    }, [procedureName]);
 
     const navigateToAddProcedure = () => {
-        router.push("addProcedure");
-      }
+        router.push('addProcedure');
+    };
+      
+    // MG 02/13/2025
+    // Function to call GetProcedureList API
+    const getProcedureList = async () => {
+        setIsLoading(true);
+        try {
+            if (!deviceID) {
+                console.log('Device ID:', deviceID);
+                throw new Error('Device information not found');
+            }
+            console.log('DeviceID:', deviceID.id); // Debugging statement
+            const currentDate = new Date();
+            const formattedDate = `${String(currentDate.getMonth() + 1).padStart(2, '0')}/${String(
+            currentDate.getDate()
+            ).padStart(2, '0')}/${currentDate.getFullYear()}-${String(currentDate.getHours()).padStart(2, '0')}:${String(
+            currentDate.getMinutes()
+            ).padStart(2, '0')}`;
+            
+            const keyString = `${deviceID.id}${formattedDate}${authorizationCode}`;
+            const key = CryptoJS.SHA1(keyString).toString();
+
+            const url = `https://PrefPic.com/dev/PPService/GetProcedureList.php?DeviceID=${encodeURIComponent(deviceID.id)}&Date=${formattedDate}&Key=${key}&AC=${authorizationCode}&PrefPicVersion=1`;
+            console.log('Fetching procedure list from URL:', url); // Debugging statement
+            const response = await fetch(url);
+            const data = await response.text();
+            console.log('API response:', data); // Debugging statement
+
+            const parser = new XMLParser();
+            const result = parser.parse(data);
+
+            const procedureList = result?.ProcedureList?.Procedure || [];
+            console.log('Parsed procedure list:', procedureList); // Debugging statement
+            setProcedures(procedureList.map((procedure: any) => procedure.Name));
+        } catch (error) {
+            console.error('Error fetching procedure list:', error);
+            Alert.alert('Error', 'An error occurred while fetching the procedure list');
+        } finally {
+            setIsLoading(false);
+        }
+    }; // Added getProcedureList function
+
+    const handleCodeSubmit = async () => {
+
+        if (!deviceID || Array.isArray(deviceID)) return;
+
+        const parsedDeviceInfo = JSON.parse(deviceID.id);
+
+        setIsLoading(true);
+
+        try {
+            const currentDate = new Date();
+            const formattedDate = `${String(currentDate.getMonth() + 1).padStart(2, '0')}/${String(currentDate.getDate()).padStart(2, '0')}/${currentDate.getFullYear()}-${String(currentDate.getHours()).padStart(2, '0')}:${String(currentDate.getMinutes()).padStart(2, '0')}`;
+            const keyString = `${parsedDeviceInfo.id}${formattedDate}`;
+            const key = CryptoJS.SHA1(keyString).toString();
+
+            const url = `https://PrefPic.com/dev/PPService/AuthorizeDeviceID.php?DeviceID=${encodeURIComponent(
+                parsedDeviceInfo.id
+            )}&Date=${formattedDate}&Key=${key}&PrefPicVersion=10`;
+            console.log('Authorization URL:', url); // Debugging statement
+            const response = await fetch(url);
+            const data = await response.text();
+
+            const parser = new XMLParser();
+            const result = parser.parse(data);
+
+            const resultInfo = result?.ResultInfo;
+
+            if (resultInfo) {
+                const resultCode = resultInfo.Result;
+                const message = resultInfo.Message;
+
+                if (resultCode === 'Success') {
+                    const authorizationCode = resultInfo.Auth; // Extract the Auth code
+                    await AsyncStorage.setItem('authorizationCode', authorizationCode); // Save the authorizationCode to AsyncStorage
+                    setAuthorizationCode(authorizationCode); // Update the context
+                    getProcedureList(); // Call GetProcedureList API after successful authorization
+                } else {
+                    Alert.alert('Authorization Failed', message || 'An unknown error occurred');
+                }
+            } else {
+                Alert.alert('Authorization Failed', 'The server response was not in the expected format.');
+            }
+        } catch (error) {
+            console.error('Error during authorization:', error);
+            Alert.alert('Authorization Failed', 'An error occurred during authorization');
+        } finally {
+            setIsLoading(false);
+        }
+    }; // Added handleCodeSubmit function
 
     return (
-    <SafeAreaView style={styles.container}> 
-        <View style={styles.container}>
-            <Text style={styles.title}>DR. CRAIG CLARK</Text>
-            <Text style={styles.subtitle}>Procedures Library</Text>
-            <Text style={styles.description}>
-                On this screen you create or edit your medical procedures practices. 
-                Then you will add your pictures.
-            </Text>
-            <View style={styles.card}>
-                {/* 
-                //MG 
-                //Add Procedure */}
-                <TouchableOpacity style={styles.addButton} onPress={navigateToAddProcedure}>
-                    <Text style={styles.addProcedureButtonText}>Add Procedure   +</Text>
-                </TouchableOpacity>
-                {/* 
-                //MG 
-                //Procedure Name*/}
-                <TouchableOpacity style = {styles.input}>
-                    <Text style={styles.procedureNameButtonText}>Procedure Name</Text>
-                    <Text style={styles.arrow}>{'>'}</Text>
+        <SafeAreaView style={styles.container}>
+            <View style={styles.container}>
+                <Text style={styles.title}>DR. CRAIG CLARK</Text>
+                <Text style={styles.subtitle}>Procedures Library</Text>
+                <Text style={styles.description}>
+                    On this screen you create or edit your medical procedures practices.
+                    Then you will add your pictures.
+                </Text>
+                <View style={styles.card}>
+                    <TouchableOpacity style={styles.addButton} onPress={navigateToAddProcedure}>
+                        <Text style={styles.addProcedureButtonText}>Add Procedure   +</Text>
                     </TouchableOpacity>
-                {/* 
-                //MG 
-                //Finish */}
-                <TouchableOpacity style={styles.finishButton}>
+                    {procedures.length > 5 ? (
+                        <ScrollView>
+                            {procedures.map((procedure, index) => (
+                                <TouchableOpacity key={index} style={styles.procedureContainer} onPress={() => setSelectedProcedure(procedure)}>
+                                    <Text style={styles.procedureNameButtonText}>{procedure}</Text>
+                                    <TouchableOpacity style={styles.procedureButton}>
+                                        <Text style={styles.item}>{'>'}</Text>
+                                    </TouchableOpacity>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    ) : (
+                        <View>
+                            {procedures.map((procedure, index) => (
+                                <TouchableOpacity key={index} style={styles.procedureContainer} onPress={() => setSelectedProcedure(procedure)}>
+                                    <Text style={styles.procedureNameButtonText}>{procedure}</Text>
+                                    <TouchableOpacity style={styles.procedureButton}>
+                                        <Text style={styles.item}>{'>'}</Text>
+                                    </TouchableOpacity>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    )}
+                </View>
+                {selectedProcedure && (
+                    <View style={styles.newCard}>
+                        <Text>{selectedProcedure}</Text>
+                        <Text>Procedure Details</Text>
+                    </View>
+                )}
+                <TouchableOpacity style={styles.finishButton} onPress={handleCodeSubmit}>
                     <Text style={styles.FinishButtonText}>Finish Demo</Text>
                 </TouchableOpacity>
             </View>
-            
-        </View>
-            <BottomNavigation/>
+            <BottomNavigation />
         </SafeAreaView>
     );
 };
-
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         padding: 20,
         backgroundColor: '#E7EFFF',
+    },
+    newCard: {
+        width: '100%', // or maxWidth: 400
+        maxWidth: 500,
+        height: 400, // Adjust height as needed
+        backgroundColor: '#gray',
+        borderRadius: 10,
+        padding: 20, // Padding for inner content
+        borderWidth: 2, // Add border
+        borderColor: 'white', // Border color
+        shadowColor: '#000', // Shadow for iOS
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 2 },
+    },
+    procedureContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#B0BEC5',
+    },
+    item: {
+        color: 'gray',
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    procedureButton: {
+        backgroundColor: '#ffffff', // Button background color
+        width: 40, // Set width for the circle
+        height: 40, // Set height for the circle
+        alignItems: 'center', // Center content horizontally
+        justifyContent: 'center', // Center content vertically
     },
     navItem: {
         alignItems: 'center'
@@ -70,9 +271,8 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     procedureNameButtonText: {
-        color: 'black',
+        color: 'gray',
         fontSize: 18, // Adjusted font size
-        
     },
     arrow: {
         color: '#4A6FA5', // Arrow color
@@ -81,7 +281,7 @@ const styles = StyleSheet.create({
     card: {
         width: '100%', // or maxWidth: 400
         maxWidth: 400,
-        height: 430, // Adjust height as needed
+        height: 508, // Adjust height as needed
         backgroundColor: '#ffffff',
         borderRadius: 10,
         padding: 20, // Padding for inner content
@@ -114,15 +314,12 @@ const styles = StyleSheet.create({
         color: '#4A6FA5',
         textAlign: 'center',
         fontFamily: 'Roboto',
-
     },
     subtitle: {
         fontSize: 45,
         marginBottom: 10,
         textAlign: 'center',
         fontFamily: 'Roboto',
-
-
     },
     description: {
         marginBottom: 20,
@@ -140,7 +337,6 @@ const styles = StyleSheet.create({
         borderRadius: 30,
         alignItems: 'center',
         marginBottom: 10,
-        
     },
     input: {
         flexDirection: 'row',
@@ -163,12 +359,11 @@ const styles = StyleSheet.create({
         borderRadius: 30,
         alignItems: 'center',
         position: "absolute",
-        bottom: 30,
-        left: 20,
-        right: 20,
+        bottom: 50,
+        left: 40,
+        right: 40,
         borderColor: "#3A5A8C",
         borderWidth: 2,
-        
     },
 });
 

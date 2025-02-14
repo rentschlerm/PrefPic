@@ -2,9 +2,10 @@
 //RJP -> 2/08/2025
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useRef,useState } from 'react';
-import { router,useLocalSearchParams } from "expo-router";
+import { router,useLocalSearchParams, useRouter } from "expo-router";
 import { Button, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Image } from 'react-native';
+
 
 
 const navigateToaddprocedure = () => {
@@ -12,11 +13,12 @@ const navigateToaddprocedure = () => {
 }
 
 export default function Camera() {
+  const router = useRouter();
   const [facing] = useState<CameraType>('back'); //use back camera
   const [permission, requestPermission] = useCameraPermissions();
   const [photo, setPhoto] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null); // Camera reference
-  const { procedureName } = useLocalSearchParams<{ procedureName: string }>();
+  const { procedureName } = useLocalSearchParams();
   
 
   if (!permission) {
