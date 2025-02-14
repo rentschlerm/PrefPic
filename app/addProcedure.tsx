@@ -6,12 +6,15 @@ import CryptoJS from 'crypto-js';
 import { XMLParser } from 'fast-xml-parser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from "expo-device"; //
+//import DeviceInfo from "react-native-device-info";//
+import {getDeviceID} from "../components/deviceInfo";
 
 const AddProcedure: React.FC = () => {
+    // State variable to store the procedure name
   const [procedureName, setProcedureName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   //const [isAuthorized, setIsAuthorized] = useState(false);
-  //const [deviceID, setDeviceID] = useState<string | null>(null);
+  const [deviceID, setDeviceID] = useState<{id:string} | null>(null);
   //const [authorizationCode, setAuthorizationCode] = useState<string | null>(null);
 
   useEffect(() => {
@@ -26,23 +29,28 @@ const AddProcedure: React.FC = () => {
         console.error('Error checking stored values:', error);
       }
     };
-    const getDeviceID = async () => {
-      try {
-        const uniqueID = Device.osInternalBuildId || Device.modelId || "UnknownDevice";
-        // Save deviceID as an object with id property
-        await AsyncStorage.setItem('deviceID', uniqueID);
-        console.log("Device ID saved:", uniqueID);
-      } catch (error) {
-        console.error("Error saving device ID:", error);
-      }
-    };
+    const fetchDeviceID = async () => {
+      const id = await getDeviceID();
+      setDeviceID(id);
+    }
+    // const getDeviceID = async () => {
+    //   try {
+    //     const uniqueID = Device.osInternalBuildId || Device.modelId || "UnknownDevice";
+    //     // Save deviceID as an object with id property
+    //     await AsyncStorage.setItem('deviceID', uniqueID);
+    //     console.log("Device ID saved:", uniqueID);
+    //   } catch (error) {
+    //     console.error("Error saving device ID:", error);
+    //   }
+    // };
     checkStoredValues();
-    getDeviceID();
+    fetchDeviceID();
+    //getDeviceID();
   }, []);
 
   const createProcedure = async () => {
     try {
-      const deviceID = await AsyncStorage.getItem('deviceID');
+      //const deviceID = await AsyncStorage.getItem('deviceID');
       const authorizationCode = await AsyncStorage.getItem('authorizationCode');
       
       if (!deviceID || !authorizationCode) {
@@ -52,11 +60,11 @@ const AddProcedure: React.FC = () => {
       
       const currentDate = new Date();
       const formattedDate = `${String(currentDate.getMonth() + 1).padStart(2, '0')}/${String(currentDate.getDate()).padStart(2, '0')}/${currentDate.getFullYear()}-${String(currentDate.getHours()).padStart(2, '0')}:${String(currentDate.getMinutes()).padStart(2, '0')}`;
-      const keyString = `${deviceID}${formattedDate}${authorizationCode}`;
+      const keyString = `${deviceID.id}${formattedDate}${authorizationCode}`;
       const key = CryptoJS.SHA1(keyString).toString();
       
       //Construct API URL
-      const url = `https://PrefPic.com/dev/PPService/CreateProcedure.php?DeviceID=${encodeURIComponent(deviceID)}&Date=${formattedDate}&Key=${key}&AC=${authorizationCode}&PrefPicVersion=1&Name=${encodeURIComponent(procedureName)}`;
+      const url = `https://PrefPic.com/dev/PPService/CreateProcedure.php?DeviceID=${encodeURIComponent(deviceID.id)}&Date=${formattedDate}&Key=${key}&AC=${authorizationCode}&PrefPicVersion=1&Name=${encodeURIComponent(procedureName)}`;
       
       console.log('API Request URL:', url);
       
@@ -119,6 +127,14 @@ const AddProcedure: React.FC = () => {
     }
   };
 
+  //Function to navigate to the "library" screen
+// const navigatetoLibrary = () => {
+//   router.push({
+//     pathname: "library", // Navigating to the "library" route
+//     params: {procedureName: procedureName},
+//   });
+//   };
+  
   const navigateToLibrary = () => {
     router.push({
       pathname: "library",
@@ -126,6 +142,15 @@ const AddProcedure: React.FC = () => {
     });
   };
     
+  // RJP - > 2/7/2025
+ // Function to navigate to the "camera" screen with procedureName as a parameter
+// const navigateToReviewImage = () => {
+//   router.push({
+//     pathname: "camera", // Navigating to the "camera" route
+//     params: { procedureName: procedureName }, // Passing procedureName as a parameter 
+//   });
+// };
+
   const navigateToReviewImage = () => {
     router.push({
       pathname: "camera",
@@ -226,7 +251,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   disabledButton: {
-    backgroundColor: "#A0A0A0",
+    backgroundColor: "#A0A0A0", // Greyed out when disabled
   },
   nextButtonText: {
     color: "#FFFFFF",
