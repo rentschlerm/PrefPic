@@ -88,33 +88,37 @@ const LibraryScreen: React.FC = () => {
             console.log('DeviceID:', deviceID.id); // Debugging statement
             const currentDate = new Date();
             const formattedDate = `${String(currentDate.getMonth() + 1).padStart(2, '0')}/${String(
-            currentDate.getDate()
+                currentDate.getDate()
             ).padStart(2, '0')}/${currentDate.getFullYear()}-${String(currentDate.getHours()).padStart(2, '0')}:${String(
-            currentDate.getMinutes()
+                currentDate.getMinutes()
             ).padStart(2, '0')}`;
-            
+    
             const keyString = `${deviceID.id}${formattedDate}${authorizationCode}`;
             const key = CryptoJS.SHA1(keyString).toString();
-
+    
             const url = `https://PrefPic.com/dev/PPService/GetProcedureList.php?DeviceID=${encodeURIComponent(deviceID.id)}&Date=${formattedDate}&Key=${key}&AC=${authorizationCode}&PrefPicVersion=1`;
             console.log('Fetching procedure list from URL:', url); // Debugging statement
             const response = await fetch(url);
             const data = await response.text();
             console.log('API response:', data); // Debugging statement
-
+    
             const parser = new XMLParser();
             const result = parser.parse(data);
-
-            const procedureList = result?.ProcedureList?.Procedure || [];
-            console.log('Parsed procedure list:', procedureList); // Debugging statement
-            setProcedures(procedureList.map((procedure: any) => procedure.Name));
+    
+            // Correctly extract the procedure list
+            const procedureList = result?.ResultInfo?.Selections?.Procedure || [];
+            const proceduresArray = Array.isArray(procedureList) ? procedureList : [procedureList];
+            console.log('Parsed procedure list:', proceduresArray); // Debugging statement
+    
+            // Update the procedures state
+            setProcedures(proceduresArray.map((procedure: any) => procedure.Name));
         } catch (error) {
             console.error('Error fetching procedure list:', error);
             Alert.alert('Error', 'An error occurred while fetching the procedure list');
         } finally {
             setIsLoading(false);
         }
-    }; // Added getProcedureList function
+    };// Added getProcedureList function
 
     const handleCodeSubmit = async () => {
 
